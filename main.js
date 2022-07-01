@@ -1,78 +1,121 @@
-let lastFrameTime = Date.now() / 1000;
-let canvas, context;
-let assetManager;
-let skeleton, animationState, bounds;
-let skeletonRenderer;
+let animationState = "idle";
+/*
+|--------------------------------------------------------------------------
+| create the pixi app
+|--------------------------------------------------------------------------
+*/
 
-async function load() {
-  canvas = document.getElementById("canvas");
-  context = canvas.getContext("2d");
-  skeletonRenderer = new spine.SkeletonRenderer(context);
+const app = new PIXI.Application({
+  transparent: true,
+  width: 300,
+  height: 300,
+});
+document.getElementById("chatProfessor").appendChild(app.view);
 
-  // Load the assets.
-  assetManager = new spine.AssetManager("professor/");
-  assetManager.loadText("Professor_Spine.json");
-  assetManager.loadTextureAtlas("Professor_Spine.atlas");
-  await assetManager.loadAll();
+/*
+|--------------------------------------------------------------------------
+| load spine data
+|--------------------------------------------------------------------------
+*/
+app.loader
+  .add("professor", "professor/3.8/Professor_Spine.json")
+  .load(onAssetsLoaded);
+app.stage.interactive = true;
 
-  // Create the texture atlas and skeleton data.
-  let atlas = assetManager.require("Professor_Spine.atlas");
-  let atlasLoader = new spine.AtlasAttachmentLoader(atlas);
-  let skeletonJson = new spine.SkeletonJson(atlasLoader);
-  let skeletonData = skeletonJson.readSkeletonData(
-    assetManager.require("Professor_Spine.json")
+/*
+|--------------------------------------------------------------------------
+| assets loaded, start the animation
+|--------------------------------------------------------------------------
+*/
+
+function disableEvents(e) {
+  e.stopPropagation();
+  e.preventDefault();
+}
+
+function onAssetsLoaded(loader, res) {
+  const professorSpine = new PIXI.spine.Spine(res.professor.spineData);
+
+  // scale and position the spine
+  professorSpine.x = app.screen.width / 2;
+  professorSpine.y = app.screen.height;
+  professorSpine.scale.set(0.12);
+
+  // position the professor
+  app.stage.position.x = 50;
+  app.stage.position.y = 80;
+  app.stage.addChild(professorSpine);
+
+  // @AnimationsNames ['Clic', 'Clic_idle', 'idle', 'Volta'];
+  //const singleAnimations = ["idle", "Clic", "Clic_idle", "Volta"];
+  //const allAnimations = [].concat(singleAnimations, loopAnimations);
+  const loopAnimations = ["idle", "Clic_idle"];
+  professorSpine.state.setAnimation(
+    0,
+    animationState,
+    loopAnimations.includes(animationState)
   );
 
-  // Instantiate a new skeleton based on the atlas and skeleton data.
-  skeleton = new spine.Skeleton(skeletonData);
-  skeleton.setToSetupPose();
-  skeleton.updateWorldTransform();
-  bounds = skeleton.getBoundsRect();
+  /*
+  |--------------------------------------------------------------------------
+  | Animation state change
+  |--------------------------------------------------------------------------
+  */
+  document.querySelector("canvas").addEventListener("click", () => {
+    // DISABLE CLICKS
+    document.addEventListener("click", disableEvents, true);
 
-  // Setup an animation state with a default mix of 0.2 seconds.
-  var animationStateData = new spine.AnimationStateData(skeleton.data);
-  animationStateData.defaultMix = 0.2;
-  animationState = new spine.AnimationState(animationStateData);
-  console.log(animationStateData);
+    if (animationState == "idle") {
+      // STEP 1: idle -> Clic
+      animationState = "Clic";
+      addButtons("700");
+      setAnimation(animationState, professorSpine, loopAnimations);
 
-  // Set the run animation, looping.
-  animationState.setAnimation(0, "Clic", false);
+      // STEP 2: Clic -> Clic_idle
+      animationState = "Clic_idle";
+      setAnimation(animationState, professorSpine, loopAnimations, "1900");
+    } else {
+      // STEP 3: Clic_idle -> Volta
+      removeButtons("500");
+      animationState = "Volta";
+      setAnimation(animationState, professorSpine, loopAnimations);
 
-  // Start rendering.
-  requestAnimationFrame(render);
+      // STEP 4: Volta -> idle
+      animationState = "idle";
+      setAnimation(animationState, professorSpine, loopAnimations, "1000");
+    }
+
+    // ENABLE CLICKS
+    setTimeout(function () {
+      document.removeEventListener("click", disableEvents, true);
+    }, 2000);
+  });
+
+  console.log(animationState);
 }
 
-function render() {
-  // Calculate the delta time between this and the last frame in seconds.
-  var now = Date.now() / 1000;
-  var delta = now - lastFrameTime;
-  lastFrameTime = now;
-
-  // Resize the canvas drawing buffer if the canvas CSS width and height changed
-  // and clear the canvas.
-  if (
-    canvas.width != canvas.clientWidth ||
-    canvas.height != canvas.clientHeight
-  ) {
-    canvas.width = canvas.clientWidth;
-    canvas.height = canvas.clientHeight;
-  }
-  context.clearRect(0, 0, canvas.width, canvas.height);
-
-  // Center the skeleton and resize it so it fits inside the canvas.
-  skeleton.x = canvas.width / 2;
-  skeleton.y = canvas.height - canvas.height * 0.1;
-  let scale = (canvas.height / bounds.height) * 0.8;
-  skeleton.scaleX = scale;
-  skeleton.scaleY = -scale;
-
-  // Update and apply the animation state, update the skeleton's
-  // world transforms and render the skeleton.
-  animationState.update(delta);
-  animationState.apply(skeleton);
-  skeleton.updateWorldTransform();
-  skeletonRenderer.draw(skeleton);
-  requestAnimationFrame(render);
+function setAnimation(animationName, spine, loopAnimations, time = 0) {
+  setTimeout(() => {
+    spine.state.setAnimation(
+      0,
+      animationName,
+      loopAnimations.includes(animationName)
+    );
+  }, time);
 }
 
-load();
+function addButtons(time = 700) {
+  const buttons = document.getElementById("chat-professor-buttons");
+
+  setTimeout(() => {
+    buttons.innerHTML = "<b>TESTE</b>";
+  }, time);
+}
+
+function removeButtons(time = 700) {
+  const buttons = document.getElementById("chat-professor-buttons");
+
+  setTimeout(() => {
+    buttons.innerHTML = "";
+  }, time);
+}

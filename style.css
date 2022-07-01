@@ -1,0 +1,10 @@
+body {
+  background-color: #1d1d1d;
+}
+#chatProfessor {
+  display: block;
+  position: absolute;
+  bottom: 0px;
+  right: 0;
+  cursor: pointer;
+}
